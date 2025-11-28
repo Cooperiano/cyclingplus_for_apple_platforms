@@ -1,0 +1,9 @@
+transformers>=4.35.0
+peft>=0.4.0
+accelerate>=0.20.0
+bitsandbytes
+datasets
+torch
+torchvision
+huggingface_hub
+Pillow
