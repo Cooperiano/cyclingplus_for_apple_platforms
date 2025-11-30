@@ -73,11 +73,6 @@ class StravaSyncService: ObservableObject {
                 
                 currentPage += 1
                 
-                // Limit to prevent excessive API calls
-                if currentPage > 20 {
-                    break
-                }
-                
                 // Rate limiting
                 try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
             }
@@ -161,6 +156,21 @@ class StravaSyncService: ObservableObject {
         if let existingActivity = try dataRepository.fetchActivity(stravaId: stravaActivity.id) {
             // Update existing activity if needed
             updateExistingActivity(existingActivity, with: stravaActivity)
+            
+            // Backfill streams if missing
+            if existingActivity.streams == nil {
+                do {
+                    let stravaStreams = try await apiService.fetchActivityStreams(activityId: stravaActivity.id)
+                    let (_, activityStreams) = apiService.convertStravaActivityToLocal(stravaActivity, streams: stravaStreams)
+                    
+                    if let streams = activityStreams {
+                        streams.activity = existingActivity
+                        try dataRepository.saveActivityStreams(streams)
+                    }
+                } catch {
+                    print("Failed to backfill streams for activity \(stravaActivity.id): \(error)")
+                }
+            }
             return
         }
         
@@ -170,20 +180,18 @@ class StravaSyncService: ObservableObject {
         // Save the activity
         try dataRepository.saveActivity(activity)
         
-        // Fetch and save streams if the activity has power or heart rate data
-        if stravaActivity.hasHeartrate || stravaActivity.averageWatts != nil {
-            do {
-                let stravaStreams = try await apiService.fetchActivityStreams(activityId: stravaActivity.id)
-                let (_, activityStreams) = apiService.convertStravaActivityToLocal(stravaActivity, streams: stravaStreams)
-                
-                if let streams = activityStreams {
-                    streams.activity = activity
-                    try dataRepository.saveActivityStreams(streams)
-                }
-            } catch {
-                // Log error but don't fail the entire sync
-                print("Failed to fetch streams for activity \(stravaActivity.id): \(error)")
+        // Fetch and save streams for all activities to enable charts/overview
+        do {
+            let stravaStreams = try await apiService.fetchActivityStreams(activityId: stravaActivity.id)
+            let (_, activityStreams) = apiService.convertStravaActivityToLocal(stravaActivity, streams: stravaStreams)
+            
+            if let streams = activityStreams {
+                streams.activity = activity
+                try dataRepository.saveActivityStreams(streams)
             }
+        } catch {
+            // Log error but don't fail the entire sync
+            print("Failed to fetch streams for activity \(stravaActivity.id): \(error)")
         }
     }
     

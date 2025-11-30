@@ -66,14 +66,12 @@ struct cyclingplusApp: App {
         self._networkPermissionService = StateObject(wrappedValue: networkPermissionService)
         self._urlSchemeHandler = StateObject(wrappedValue: URLSchemeHandler(stravaAuthManager: stravaAuthManager))
         
-        // Initialize sync coordinator with a temporary data repository
-        // We'll update this once we have access to the model context
-        let tempContainer = try! ModelContainer(for: Activity.self)
-        let tempRepository = DataRepository(modelContext: tempContainer.mainContext)
+        // Use the shared model container for the sync coordinator
+        let mainRepository = DataRepository(modelContext: sharedModelContainer.mainContext)
         self._syncCoordinator = StateObject(wrappedValue: SyncCoordinator(
             stravaAuthManager: stravaAuthManager,
             igpsportAuthManager: igpsportAuthManager,
-            dataRepository: tempRepository
+            dataRepository: mainRepository
         ))
         
         // Verify network permissions on startup

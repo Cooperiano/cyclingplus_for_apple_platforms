@@ -120,7 +120,6 @@ class FITParser {
             throw FITParseError.unexpectedEndOfFile
         }
         
-        let reserved = data[currentOffset]
         let architecture = data[currentOffset + 1]
         let isLittleEndian = architecture == 0
         

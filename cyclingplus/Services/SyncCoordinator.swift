@@ -80,8 +80,8 @@ class SyncCoordinator: ObservableObject {
         // Sync Strava if connected
         if stravaAuthManager.isAuthenticated, let stravaSyncService = stravaSyncService {
             do {
-                syncStatus = "Syncing Strava..."
-                try await stravaSyncService.syncRecentActivities()
+                syncStatus = "Syncing Strava (full history)..."
+                try await stravaSyncService.syncAllActivities()
                 completedServices += 1
                 syncProgress = Double(completedServices) / Double(totalServices)
             } catch {
@@ -123,7 +123,7 @@ class SyncCoordinator: ObservableObject {
             throw CyclingPlusError.authenticationFailed("Strava sync service not initialized")
         }
         
-        try await stravaSyncService.syncRecentActivities()
+        try await stravaSyncService.syncAllActivities()
     }
     
     func syncIGPSport() async throws {

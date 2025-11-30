@@ -7,11 +7,16 @@
 
 import SwiftUI
 import SwiftData
+import Observation
 
 struct ActivityDetailView: View {
-    let activity: Activity
-    
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab: DetailTab = .overview
+    @State private var isGeneratingAI = false
+    @State private var aiError: String?
+    
+    // Use @Bindable to allow edits in child views if needed
+    @Bindable var activity: Activity
     
     var body: some View {
         ScrollView {
@@ -141,16 +146,19 @@ struct ActivityDetailView: View {
             // Summary statistics
             if let streams = activity.streams {
                 summaryStatsView(streams: streams)
+                    .cardStyle()
             }
             
             // Power analysis summary
             if let powerAnalysis = activity.powerAnalysis {
                 powerAnalysisSummary(analysis: powerAnalysis)
+                    .cardStyle()
             }
             
             // Heart rate analysis summary
             if let hrAnalysis = activity.heartRateAnalysis {
                 heartRateAnalysisSummary(analysis: hrAnalysis)
+                    .cardStyle()
             }
         }
     }
@@ -159,28 +167,120 @@ struct ActivityDetailView: View {
         Group {
             if let streams = activity.streams {
                 MultiStreamChartView(streams: streams)
+                    .cardStyle()
             } else {
                 Text("No stream data available")
                     .foregroundColor(.secondary)
                     .padding()
+                    .cardStyle()
             }
         }
     }
     
     private var analysisView: some View {
         VStack(spacing: 16) {
+            aiAnalysisSection
+                .cardStyle()
+            
             if let powerAnalysis = activity.powerAnalysis {
                 detailedPowerAnalysis(analysis: powerAnalysis)
+                    .cardStyle()
             }
             
             if let hrAnalysis = activity.heartRateAnalysis {
                 detailedHeartRateAnalysis(analysis: hrAnalysis)
+                    .cardStyle()
             }
             
             if activity.powerAnalysis == nil && activity.heartRateAnalysis == nil {
                 Text("No analysis data available")
                     .foregroundColor(.secondary)
                     .padding()
+                    .cardStyle()
+            }
+        }
+    }
+    
+    private var aiAnalysisSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("AI Insights")
+                    .font(.headline)
+                Spacer()
+                if isGeneratingAI {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+            
+            if let ai = activity.aiAnalysis {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let md = try? AttributedString(markdown: ai.analysisText) {
+                        Text(md)
+                            .font(.body)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(4)
+                            .frame(maxWidth: 820, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(ai.analysisText)
+                            .font(.body)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(4)
+                            .frame(maxWidth: 820, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !ai.performanceInsights.isEmpty {
+                        Text("Highlights")
+                            .font(.subheadline).bold()
+                        ForEach(ai.performanceInsights, id: \.self) { insight in
+                            Label(insight, systemImage: "sparkles")
+                                .font(.callout)
+                        }
+                    }
+                    if !ai.trainingRecommendations.isEmpty {
+                        Text("Recommendations")
+                            .font(.subheadline).bold()
+                        ForEach(ai.trainingRecommendations, id: \.self) { rec in
+                            Label(rec, systemImage: "figure.cooldown")
+                                .font(.callout)
+                        }
+                    }
+                    if let advice = ai.recoveryAdvice {
+                        Label(advice, systemImage: "heart.text.square")
+                            .font(.callout)
+                    }
+                    if let score = ai.performanceScore {
+                        HStack {
+                            Label("Performance Score", systemImage: "chart.bar.xaxis")
+                            Text(String(format: "%.0f / 100", score))
+                        }
+                        .font(.callout)
+                    }
+                }
+                .frame(maxWidth: 820, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("No AI analysis yet.")
+                        .foregroundColor(.secondary)
+                    Button {
+                        generateAI()
+                    } label: {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                            Text(isGeneratingAI ? "Analyzing..." : "Generate AI Insight")
+                        }
+                        .frame(maxWidth: 240)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isGeneratingAI)
+                    
+                    if let aiError {
+                        Text(aiError)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                }
             }
         }
     }
@@ -191,10 +291,12 @@ struct ActivityDetailView: View {
                 Text("Map view coming soon")
                     .foregroundColor(.secondary)
                     .padding()
+                    .cardStyle()
             } else {
                 Text("No GPS data available")
                     .foregroundColor(.secondary)
                     .padding()
+                    .cardStyle()
             }
         }
     }
@@ -478,6 +580,23 @@ struct ActivityDetailView: View {
         guard !values.isEmpty else { return 0 }
         let total = values.reduce(0, +)
         return Double(total) / Double(values.count)
+    }
+    
+    @MainActor
+    private func generateAI() {
+        guard !isGeneratingAI else { return }
+        aiError = nil
+        isGeneratingAI = true
+        
+        Task { @MainActor in
+            do {
+                let service = AIAnalysisService(modelContext: modelContext)
+                _ = try service.generateAnalysis(for: activity)
+            } catch {
+                aiError = error.localizedDescription
+            }
+            isGeneratingAI = false
+        }
     }
 }
 

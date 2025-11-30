@@ -13,7 +13,7 @@ struct StravaCredentials: Codable {
     let accessToken: String
     let refreshToken: String
     let expiresAt: Date
-    let scope: String
+    let scope: String?
     
     var isExpired: Bool {
         Date() >= expiresAt
@@ -25,7 +25,7 @@ struct StravaTokenResponse: Codable {
     let refreshToken: String
     let expiresAt: Int
     let expiresIn: Int
-    let scope: String
+    let scope: String?
     
     private enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
@@ -228,6 +228,7 @@ struct StravaStream: Codable {
 }
 
 enum StreamValue: Codable {
+    case bool(Bool)
     case int(Int)
     case double(Double)
     case coordinate([Double])
@@ -235,7 +236,9 @@ enum StreamValue: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         
-        if let intValue = try? container.decode(Int.self) {
+        if let boolValue = try? container.decode(Bool.self) {
+            self = .bool(boolValue)
+        } else if let intValue = try? container.decode(Int.self) {
             self = .int(intValue)
         } else if let doubleValue = try? container.decode(Double.self) {
             self = .double(doubleValue)
@@ -250,6 +253,8 @@ enum StreamValue: Codable {
         var container = encoder.singleValueContainer()
         
         switch self {
+        case .bool(let value):
+            try container.encode(value)
         case .int(let value):
             try container.encode(value)
         case .double(let value):
@@ -261,6 +266,8 @@ enum StreamValue: Codable {
     
     var doubleValue: Double? {
         switch self {
+        case .bool(let value):
+            return value ? 1.0 : 0.0
         case .int(let value):
             return Double(value)
         case .double(let value):
@@ -272,6 +279,8 @@ enum StreamValue: Codable {
     
     var intValue: Int? {
         switch self {
+        case .bool(let value):
+            return value ? 1 : 0
         case .int(let value):
             return value
         case .double(let value):

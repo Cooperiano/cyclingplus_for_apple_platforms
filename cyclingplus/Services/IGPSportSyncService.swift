@@ -200,7 +200,7 @@ class IGPSportSyncService: ObservableObject {
         }
         
         // Convert to local activity
-        var activity = apiService.convertIGPSportActivityToLocal(igpsActivity)
+        let activity = apiService.convertIGPSportActivityToLocal(igpsActivity)
         activity.id = activityId // Use consistent ID format
         
         // Save the activity

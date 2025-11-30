@@ -8,12 +8,11 @@
 import SwiftUI
 
 struct StravaAuthView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var authManager: StravaAuthManager
     @State private var clientId = ""
     @State private var clientSecret = ""
-    @State private var authorizationCode = ""
     @State private var showingCredentialsSheet = false
-    @State private var showingCodeEntrySheet = false
     @State private var isAuthenticating = false
     
     init(authManager: StravaAuthManager? = nil) {
@@ -21,31 +20,38 @@ struct StravaAuthView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            if authManager.isAuthenticated {
-                authenticatedView
-            } else {
-                unauthenticatedView
+        ScrollView {
+            VStack(spacing: isCompact ? 16 : 20) {
+                if authManager.isAuthenticated {
+                    authenticatedView
+                } else {
+                    unauthenticatedView
+                }
             }
+            .padding(isCompact ? 16 : 24)
+            .frame(maxWidth: .infinity)
         }
-        .padding()
         .sheet(isPresented: $showingCredentialsSheet) {
             credentialsSheet
         }
     }
     
+    private var isCompact: Bool {
+        horizontalSizeClass == .compact
+    }
+    
     private var authenticatedView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: isCompact ? 12 : 16) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
+                .font(.system(size: isCompact ? 44 : 60))
                 .foregroundColor(.green)
             
             Text("Connected to Strava")
-                .font(.title2)
+                .font(isCompact ? .title3 : .title2)
                 .bold()
             
             if let athlete = authManager.currentAthlete {
-                VStack(spacing: 8) {
+                VStack(spacing: isCompact ? 6 : 8) {
                     Text(athlete.displayName)
                         .font(.headline)
                     
@@ -65,7 +71,7 @@ struct StravaAuthView: View {
                 #else
                 .background(Color(.secondarySystemBackground))
                 #endif
-                .cornerRadius(8)
+                .cornerRadius(10)
             }
             
             Button("Disconnect") {
@@ -77,37 +83,35 @@ struct StravaAuthView: View {
     }
     
     private var unauthenticatedView: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 12) {
+        VStack(spacing: isCompact ? 18 : 24) {
+            VStack(spacing: isCompact ? 8 : 12) {
                 Image(systemName: "link.circle")
-                    .font(.system(size: 50))
+                    .font(.system(size: isCompact ? 40 : 50))
                     .foregroundColor(.orange)
                 
                 Text("Connect to Strava")
-                    .font(.title)
+                    .font(isCompact ? .title2 : .title)
                     .bold()
                 
                 Text("Sync your cycling activities and analyze your performance data.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 400)
+                    .frame(maxWidth: isCompact ? .infinity : 420)
             }
             
             if let error = authManager.authenticationError {
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
                     Text(error)
                         .font(.callout)
                         .foregroundColor(.red)
                 }
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
+                .cardStyle()
             }
             
-            VStack(spacing: 16) {
+            VStack(spacing: isCompact ? 12 : 16) {
                 Button {
                     showingCredentialsSheet = true
                 } label: {
@@ -115,18 +119,21 @@ struct StravaAuthView: View {
                         Image(systemName: "key.fill")
                         Text("Configure API Credentials")
                     }
-                    .frame(width: 250)
+                    .frame(maxWidth: isCompact ? .infinity : 260)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
+                .controlSize(isCompact ? .regular : .large)
+                .padding(.horizontal, isCompact ? 6 : 0)
                 
                 Button {
                     Task {
                         isAuthenticating = true
+                        authManager.authenticationError = nil
                         do {
                             try await authManager.authenticate()
                         } catch {
                             print("Authentication error: \(error)")
+                            authManager.authenticationError = error.localizedDescription
                         }
                         isAuthenticating = false
                     }
@@ -141,41 +148,36 @@ struct StravaAuthView: View {
                         }
                         Text(isAuthenticating ? "Connecting..." : "Connect to Strava")
                     }
-                    .frame(width: 250)
+                    .frame(maxWidth: isCompact ? .infinity : 260)
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .controlSize(isCompact ? .regular : .large)
                 .disabled(isAuthenticating)
-                
-                Text("or")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Button {
-                    showingCodeEntrySheet = true
-                } label: {
-                    HStack {
-                        Image(systemName: "keyboard")
-                        Text("Enter Authorization Code")
-                    }
-                    .frame(width: 250)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .padding(.horizontal, isCompact ? 6 : 0)
             }
             
-            Text("After clicking Connect, copy the code from the browser URL")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: isCompact ? 2 : 4) {
+                Text("After clicking Connect:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("1. Authorize on Strava")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("2. Wait for the browser to close automatically")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("3. The app will finish authentication automatically")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .cardStyle()
         }
-        .frame(maxWidth: 500)
-        .sheet(isPresented: $showingCodeEntrySheet) {
-            codeEntrySheet
-        }
+        .frame(maxWidth: isCompact ? .infinity : 520, alignment: .center)
     }
     
     private var credentialsSheet: some View {
+        ScrollView {
         VStack(spacing: 20) {
             Text("Strava API Configuration")
                 .font(.title2)
@@ -187,7 +189,7 @@ struct StravaAuthView: View {
                         .font(.headline)
                     TextField("Enter your Strava Client ID", text: $clientId)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 400)
+                        .frame(maxWidth: isCompact ? .infinity : 420)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -195,7 +197,7 @@ struct StravaAuthView: View {
                         .font(.headline)
                     SecureField("Enter your Strava Client Secret", text: $clientSecret)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 400)
+                        .frame(maxWidth: isCompact ? .infinity : 420)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -207,26 +209,16 @@ struct StravaAuthView: View {
                     Link("https://www.strava.com/settings/api", destination: URL(string: "https://www.strava.com/settings/api")!)
                         .font(.caption)
                     
-                    Text("2. Set Authorization Callback Domain to: localhost")
+                    Text("2. Set Authorization Callback Domain to: cyclingplus")
                         .font(.caption)
                     
-                    Text("3. The app will use: http://localhost/exchange_token")
+                    Text("3. The app will use: cyclingplus://cyclingplus")
                         .font(.caption)
                     
                     Text("4. Copy your Client ID and Client Secret above")
                         .font(.caption)
                 }
-                .padding()
-                #if os(macOS)
-                #if os(macOS)
-                .background(Color(nsColor: .controlBackgroundColor))
-                #else
-                .background(Color(.secondarySystemBackground))
-                #endif
-                #else
-                .background(Color(.secondarySystemBackground))
-                #endif
-                .cornerRadius(8)
+                .cardStyle()
             }
             
             HStack(spacing: 12) {
@@ -243,10 +235,11 @@ struct StravaAuthView: View {
                 .disabled(clientId.isEmpty || clientSecret.isEmpty)
             }
         }
-        .padding(30)
-        .frame(width: 500)
+        .padding(isCompact ? 20 : 30)
+        .frame(maxWidth: isCompact ? .infinity : 520)
         .onAppear {
             loadCredentials()
+        }
         }
     }
     
@@ -279,71 +272,6 @@ struct StravaAuthView: View {
            let secret = String(data: data, encoding: .utf8) {
             clientSecret = secret
         }
-    }
-    
-    private var codeEntrySheet: some View {
-        VStack(spacing: 20) {
-            Text("Enter Authorization Code")
-                .font(.title2)
-                .bold()
-            
-            VStack(alignment: .leading, spacing: 16) {
-                Text("After authorizing in the browser, you'll be redirected to a URL like:")
-                    .font(.caption)
-                
-                Text("http://localhost/?state=&code=YOUR_CODE_HERE&scope=read,activity:read_all")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding()
-                    #if os(macOS)
-                    #if os(macOS)
-                .background(Color(nsColor: .controlBackgroundColor))
-                #else
-                .background(Color(.secondarySystemBackground))
-                #endif
-                    #else
-                    .background(Color(.secondarySystemBackground))
-                    #endif
-                    .cornerRadius(8)
-                
-                Text("Copy the code parameter from the URL and paste it below:")
-                    .font(.caption)
-                
-                TextField("Paste authorization code here", text: $authorizationCode)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 400)
-            }
-            
-            HStack(spacing: 12) {
-                Button("Cancel") {
-                    showingCodeEntrySheet = false
-                    authorizationCode = ""
-                }
-                .keyboardShortcut(.cancelAction)
-                
-                Button("Connect") {
-                    Task {
-                        isAuthenticating = true
-                        do {
-                            // Create a fake URL with the code
-                            let urlString = "http://localhost/?code=\(authorizationCode)"
-                            if let url = URL(string: urlString) {
-                                try await authManager.handleAuthorizationCallback(url: url)
-                                showingCodeEntrySheet = false
-                                authorizationCode = ""
-                            }
-                        } catch {
-                            print("Authentication error: \(error)")
-                        }
-                        isAuthenticating = false
-                    }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(authorizationCode.isEmpty || isAuthenticating)
-            }
-        }
-        .padding(30)
-        .frame(width: 500)
     }
 }
 
