@@ -9,7 +9,7 @@
 ### 第一步：配置 Strava API
 
 1. 访问 https://www.strava.com/settings/api
-2. 找到你的应用（Client ID: 178419）
+2. 找到你的应用（Client ID: ）
 3. 在 **Authorization Callback Domain** 字段中输入：`cyclingplus`
 4. 点击 "Update" 保存
 
@@ -19,7 +19,7 @@
 2. 进入 Settings → Data Sources → Strava
 3. 点击 "Configure API Credentials"
 4. 输入：
-   - **Client ID**: `178419`
+   - **Client ID**: `(从你的 Strava API 页面复制)`
    - **Client Secret**: (从你的 Strava API 页面复制)
 5. 点击 "Save"
 
