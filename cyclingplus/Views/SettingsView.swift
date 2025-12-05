@@ -11,6 +11,7 @@ struct SettingsView: View {
     @EnvironmentObject private var stravaAuthManager: StravaAuthManager
     @EnvironmentObject private var igpsportAuthManager: IGPSportAuthManager
     @EnvironmentObject private var networkPermissionService: NetworkPermissionService
+    @EnvironmentObject private var languageManager: LanguageManager
     
     private var connectionStatusIndicator: some View {
         HStack(spacing: 4) {
@@ -174,6 +175,12 @@ struct SettingsView: View {
                             Image(systemName: "gearshape.fill")
                                 .foregroundColor(.gray)
                             Text("General")
+                        }
+                    }
+                    
+                    Picker("Language", selection: $languageManager.language) {
+                        ForEach(AppLanguage.allCases, id: \.self) { lang in
+                            Text(lang.displayName).tag(lang)
                         }
                     }
                 }

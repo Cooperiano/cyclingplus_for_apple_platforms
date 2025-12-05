@@ -55,3 +55,47 @@ CyclingPlus 是一款基于 SwiftUI + SwiftData 的骑行数据中枢，支持 S
 ## 备注
 - URL Scheme 默认 `cyclingplus://cyclingplus`，确保授权回调与 Strava 配置一致。
 - 如出现授权或同步失败，优先检查网络权限、凭据正确性及 Strava/iGPSport 服务状态。提交 issue 时附上控制台日志有助于定位。
+
+---
+
+## CyclingPlus – AI-Powered Cycling Insights
+
+### 🚴 Inspiration
+As a cycling enthusiast, I wanted expert, always‑available feedback. CyclingPlus became that AI companion, giving coach‑level insights any time.
+
+### ⚡ What It Does
+Sync rides from Strava and turn raw logs into actionable insights:
+- Power & cadence patterns
+- Fatigue indicators
+- Acceleration/deceleration trends
+- Strengths/weaknesses and tailored suggestions
+- Bilingual output (English / 简体中文) that follows the app language setting
+- Streaming AI chat with per‑activity memory so you can keep the conversation going
+
+### 🛠 How We Built It
+- Kiro as processing foundation
+- Codex/LLMs for logic refinement
+- Apple ecosystem (macOS focus today)
+- Hybrid: Strava APIs + local analytics + AI reasoning
+
+### 🧩 Challenges
+- Strava OAuth edge cases needing custom fixes
+- Some models underperforming on structured sports analytics
+- Large workout datasets efficiency
+- Cross‑model consistency for AI outputs
+
+### 🏆 Accomplishments
+- End‑to‑end Strava → AI insights pipeline
+- Clean UI with fast sync
+- Athlete‑level analysis built solo across the Apple stack
+
+### 📚 Learnings
+- AI needs the right tool mix and real ride data
+- Framework collaboration (Kiro, Codex, custom scripts) matters
+- Cycling data is messy; stable analytics need discipline
+
+### 🚀 What’s Next (iOS/iPadOS)
+- Richer visuals: heatmaps, cadence‑power scatter, elevation flow
+- Accel/decel analysis for technical segments
+- Better climb/descend breakdowns
+- AI‑powered training suggestions

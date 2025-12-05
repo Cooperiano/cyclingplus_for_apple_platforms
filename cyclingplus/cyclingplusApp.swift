@@ -15,6 +15,7 @@ struct cyclingplusApp: App {
     @StateObject private var networkPermissionService = NetworkPermissionService()
     @StateObject private var urlSchemeHandler: URLSchemeHandler
     @StateObject private var syncCoordinator: SyncCoordinator
+    @StateObject private var languageManager = LanguageManager()
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -89,6 +90,7 @@ struct cyclingplusApp: App {
                 .environmentObject(igpsportAuthManager)
                 .environmentObject(networkPermissionService)
                 .environmentObject(syncCoordinator)
+                .environmentObject(languageManager)
                 .onOpenURL { url in
                     Task {
                         await urlSchemeHandler.handleURL(url)
@@ -169,6 +171,7 @@ struct cyclingplusApp: App {
                 .environmentObject(igpsportAuthManager)
                 .environmentObject(networkPermissionService)
                 .environmentObject(syncCoordinator)
+                .environmentObject(languageManager)
                 .frame(minWidth: 800, idealWidth: 900, maxWidth: 1200, minHeight: 600, idealHeight: 700, maxHeight: 1000)
         }
         #else
@@ -179,6 +182,7 @@ struct cyclingplusApp: App {
                 .environmentObject(igpsportAuthManager)
                 .environmentObject(networkPermissionService)
                 .environmentObject(syncCoordinator)
+                .environmentObject(languageManager)
                 .onOpenURL { url in
                     Task {
                         await urlSchemeHandler.handleURL(url)

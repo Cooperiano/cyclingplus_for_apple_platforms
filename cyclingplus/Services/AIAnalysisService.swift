@@ -76,22 +76,33 @@ struct AIAnalysisService {
         let recovery = recoveryAdvice(for: estimatedLoad)
         let score = performanceScore(load: estimatedLoad, avgSpeed: avgSpeedKph, elevation: elevation)
         
-        var summaryLines: [String] = []
-        summaryLines.append("骑行摘要：\(String(format: "%.1f", distanceKm)) km，用时 \(formattedDuration(activity.duration))，平均速度 \(String(format: "%.1f", avgSpeedKph)) km/h，爬升 \(Int(elevation)) m。")
+        let language = currentLanguage()
+        
+        var summaryLinesCN: [String] = []
+        summaryLinesCN.append("骑行摘要：\(String(format: "%.1f", distanceKm)) km，用时 \(formattedDuration(activity.duration))，平均速度 \(String(format: "%.1f", avgSpeedKph)) km/h，爬升 \(Int(elevation)) m。")
         if let np {
             let ifText = intensityFactor.map { String(format: ", IF %.2f", $0) } ?? ""
-            summaryLines.append("标准化功率 \(Int(np)) W\(ifText)。")
+            summaryLinesCN.append("标准化功率 \(Int(np)) W\(ifText)。")
         } else if let avgPower {
-            summaryLines.append("平均功率 \(Int(avgPower)) W。")
+            summaryLinesCN.append("平均功率 \(Int(avgPower)) W。")
         }
         if let tss {
-            summaryLines.append("训练负荷 TSS ≈ \(Int(tss)).")
+            summaryLinesCN.append("训练负荷 TSS ≈ \(Int(tss)).")
         }
         if let avgHR {
             let zoneText = hrZones.map { "，区间分布：\($0.description)" } ?? ""
-            summaryLines.append("平均心率 \(avgHR) bpm\(zoneText)。")
+            summaryLinesCN.append("平均心率 \(avgHR) bpm\(zoneText)。")
         }
-        let summary = summaryLines.joined(separator: " ")
+        let summaryCN = summaryLinesCN.joined(separator: " ")
+        
+        let englishSummary = """
+Ride summary: \(String(format: "%.1f", distanceKm)) km in \(formattedDuration(activity.duration)), \
+avg speed \(String(format: "%.1f", avgSpeedKph)) km/h, elevation \(Int(elevation)) m. \
+NP \(np.map { String(Int($0)) } ?? "n/a") W, IF \(intensityFactor.map { String(format: "%.2f", $0) } ?? "n/a"), \
+TSS \(tss.map { String(Int($0)) } ?? "n/a"), avg HR \(avgHR.map { "\($0) bpm" } ?? "n/a").
+"""
+        let summary = language == .simplifiedChinese ? summaryCN : englishSummary
+        let remoteSummary = summary
         
         let analysis = AIAnalysis(
             activityId: activity.id,
@@ -112,8 +123,9 @@ struct AIAnalysisService {
             Task.detached { @MainActor in
                 do {
                     let provider = RemoteAIClient.Provider(rawValue: aiProvider.lowercased()) ?? .deepseek
-                    let prompt = buildRemotePrompt(activity: activity, summary: summary, np: np, intensityFactor: intensityFactor, tss: tss, hrZones: hrZones, weightKg: weightKg)
-                    let systemPrompt = remoteSystemPrompt()
+                    let language = currentLanguage()
+                    let prompt = buildRemotePrompt(activity: activity, summary: remoteSummary, np: np, intensityFactor: intensityFactor, tss: tss, hrZones: hrZones, weightKg: weightKg, language: language)
+                    let systemPrompt = remoteSystemPrompt(language: language)
                     let client = RemoteAIClient()
                     let remoteText = try await client.chat(provider: provider, apiKey: apiKey, prompt: prompt, model: nil, system: systemPrompt)
                     analysis.analysisText = remoteText
@@ -316,7 +328,7 @@ struct AIAnalysisService {
         )
     }
 
-    private func buildRemotePrompt(activity: Activity, summary: String, np: Double?, intensityFactor: Double?, tss: Double?, hrZones: HeartRateZoneSummary?, weightKg: Double?) -> String {
+    private func buildRemotePrompt(activity: Activity, summary: String, np: Double?, intensityFactor: Double?, tss: Double?, hrZones: HeartRateZoneSummary?, weightKg: Double?, language: AppLanguage = .currentFromDefaults()) -> String {
         let distanceKm = activity.distance / 1000.0
         let durationHrs = activity.duration / 3600.0
         let elevation = activity.elevationGain
@@ -332,7 +344,8 @@ struct AIAnalysisService {
             streamSummary = "No stream data."
         }
 
-        return """
+        if language == .simplifiedChinese {
+            return """
 骑行数据摘要（用于 AI 分析）：
 - 距离：\(String(format: "%.1f", distanceKm)) km，时长：\(formattedDuration(activity.duration))，爬升：\(Int(elevation)) m
 - 平均速度：\(String(format: "%.1f", avgSpeedKph)) km/h
@@ -348,40 +361,55 @@ struct AIAnalysisService {
 4) 改进与优化建议：技术/配速/区间训练方向，2-3 条可执行建议。
 如数据不足，请说明限制。用标题+要点，语言专业但易懂。
 """
+        } else {
+            return """
+Ride data summary (for AI analysis):
+- Distance: \(String(format: "%.1f", distanceKm)) km, Duration: \(formattedDuration(activity.duration)), Elevation: \(Int(elevation)) m
+- Avg speed: \(String(format: "%.1f", avgSpeedKph)) km/h
+- Avg power: \(avgPower.map { "\(Int($0)) W" } ?? "n/a"), NP: \(np.map { "\(Int($0)) W" } ?? "n/a"), IF: \(intensityFactor.map { String(format: "%.2f", $0) } ?? "n/a"), TSS: \(tss.map { String(Int($0)) } ?? "n/a")
+- Avg HR: \(avgHR.map { "\($0) bpm" } ?? "n/a"), HR zones: \(hrZones?.description ?? "n/a")
+- Weight: \(weightKg.map { String(format: "%.1f kg", $0) } ?? "unknown")
+- Streams: \(streamSummary)
+
+Please produce a structured English report with:
+1) Intensity evaluation: AP/NP/IF, HR distribution, Pa:Hr if possible; state if load is too high/low/appropriate and why.
+2) Effectiveness: TSS/load, EF if possible, key power-curve points; main stimulus type and trend.
+3) Recovery advice: required recovery time and type (rest/easy/XT) based on load/TSB if available.
+4) Improvement tips: pacing/technique/interval focus, 2–3 actionable bullets.
+If data is missing, call it out. Use headings + bullet points, concise and clear.
+"""
+        }
     }
 
-    private func remoteSystemPrompt() -> String {
-        return """
-你是一位专业的骑行教练与运动生理数据分析专家，擅长通过功率、心率及训练负荷数据评估骑行表现，并提供个性化训练策略。
-你的目标是生成系统化、专业但易懂的骑行训练分析报告。
+    private func remoteSystemPrompt(language: AppLanguage = .currentFromDefaults()) -> String {
+        if language == .simplifiedChinese {
+            return """
+你是一位专业的骑行教练与运动生理数据分析专家，擅长通过功率、心率及训练负荷数据评估骑行表现，并提供个性化训练策略。请用中文，条理清晰、简洁地输出。
 
-分析报告需从以下方面展开（可根据数据完整性自动调整）：
+分析侧重：
+- 强度：AP/NP/IF，心率分布，Pa:Hr（如有），结论：强度过强/过弱/合理。
+- 效果：TSS/负荷，EF（若可），功率曲线关键点；主要刺激类型与趋势。
+- 恢复：给出恢复需求、恢复时间与方式（休息/低强度/交叉），说明依据。
+- 优化：技术/配速/区间训练的 2-3 条可执行建议。
 
-### 一、训练强度评估
-- 平均功率（AP）与标准化功率（NP），强度因子（IF）
-- 心率分布区间，占比是否符合目标区间
-- 最大/平均心率比值、功率-心率漂移（Pa:Hr）评估耐力稳定性
-- 结论：强度过强/过弱/合理，给出原因
-
-### 二、训练效果评估
-- 训练负荷（TSS或等效负荷）、效率因子（EF=NP/HR）
-- 功率曲线关键点（20min/5min/1min/30s）若有
-- 可引用 CTL/ATL/TSB 趋势（若无则跳过）
-- 结论：主要刺激类型、是否达成目标、趋势（提升/平台/疲劳）
-
-### 三、恢复与疲劳建议
-- 根据负荷/TSB（或主观感受假设）给出恢复需求
-- 建议恢复时间、恢复类型（休息/低强度/交叉训练），说明依据
-
-### 四、改进与优化建议
-- 技术：踏频、功率平稳度(VI)、配速策略、上坡/平路输出一致性
-- 训练结构：Tempo/Sweet Spot/VO2max 等区间强化建议
-- 功率/心率分布优化，节奏控制
-
-输出要求：
-- 结构化报告（标题+要点），中文，专业但易懂
-- 结合数据解释与训练意义，给出可执行建议
-- 数据不足时说明限制并给出补充建议
+要求：标题 + 要点，专业但易懂；数据不足时说明限制并给出补充建议。
 """
+        } else {
+            return """
+You are a cycling coach and exercise physiologist. Generate a concise, structured English report.
+
+Focus:
+- Intensity: AP/NP/IF, HR distribution, Pa:Hr if present; conclude whether intensity is too high/low/appropriate and why.
+- Effectiveness: TSS/load, EF if possible, key power-curve points; main stimulus type and trend.
+- Recovery: required recovery time and type (rest/easy/cross training) with rationale.
+- Improvements: 2–3 actionable tips on pacing/technique/interval focus.
+
+Format: headings + bullet points, clear and concise. Call out missing data and suggest improvements if needed.
+"""
+        }
+    }
+
+    private func currentLanguage() -> AppLanguage {
+        AppLanguage.currentFromDefaults()
     }
 }
